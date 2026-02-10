@@ -6,26 +6,49 @@ import {
   TextField,
   Button,
   Rating,
-  Checkbox,
-  FormControlLabel,
   Stack,
-} from '@mui/material'
+} from '@mui/material';
+import { DynamoDBClient, PutItemCommand } from "@aws-sdk/client-dynamodb";
+import { v4 as uuidv4  } from 'uuid';
 
-export default function RatingCard({ teamName }) {
+// Configure client with IAM creds
+const client = new DynamoDBClient({
+  region: "ap-south-1",
+  credentials: {
+    accessKeyId: "",
+    secretAccessKey: "",
+  },
+});
+
+export default function RatingCard({ teamName, userName, onSubmit }) {
   const [rating, setRating] = useState(0)
-  const [name, setName] = useState('')
-  const [anonymous, setAnonymous] = useState(true)
+  const [name, setName] = useState(userName)
 
-  const handleSubmit = () => {
-    const payload = {
-      team: teamName,
-      rating,
-      name: anonymous ? 'Anonymous' : name,
-    }
+const handleSubmit = async () => {
+  const payload = {
+    team: teamName,
+    rating,
+    name: name,
+  };
 
-    console.log('Submitted:', payload)
-    alert('Thanks for your feedback!')
-  }
+  const params = {
+    TableName: "SharedValues",
+    Item: {
+      id: { S: uuidv4() },            // primary key
+      team: { S: payload.team },
+      rating: { N: String(payload.rating) },
+      jname: { S: payload.name },
+      createdAt: { S: new Date().toISOString() }, // optional but recommended
+    },
+  };
+
+  const data = await client.send(new PutItemCommand(params));
+
+  console.log("Submitted:", data);
+  alert("Thanks for your feedback!");
+  onSubmit();
+};
+
 
   return (
     <Card elevation={4}>
@@ -40,24 +63,13 @@ export default function RatingCard({ teamName }) {
             max={10}
           />
 
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={anonymous}
-                onChange={(e) => setAnonymous(e.target.checked)}
-              />
-            }
-            label="Submit anonymously"
+          <TextField
+            label="Your Name"
+            fullWidth
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            disabled
           />
-
-          {!anonymous && (
-            <TextField
-              label="Your Name"
-              fullWidth
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          )}
 
           <Button
             variant="contained"
